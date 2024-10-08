@@ -1,4 +1,3 @@
-
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
@@ -99,10 +98,12 @@ class LRMInferrer:
         return render_cameras.unsqueeze(0).repeat(batch_size, 1, 1)
 
     @staticmethod
-    def images_to_video(images, output_path, fps, verbose=False):
+    def images_to_video(images, output_path, fps, image_uid, verbose=False):
         # images: (T, C, H, W)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         frames = []
+
+        # Iterate over the frames to create a list of NumPy arrays
         for i in range(images.shape[0]):
             frame = (images[i].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
             assert frame.shape[0] == images.shape[2] and frame.shape[1] == images.shape[3], \
@@ -110,6 +111,19 @@ class LRMInferrer:
             assert frame.min() >= 0 and frame.max() <= 255, \
                 f"Frame value out of range: {frame.min()} ~ {frame.max()}"
             frames.append(frame)
+
+        # Save the back frame, assuming it's roughly halfway around the object
+        back_frame_index = len(frames) // 2  # Choosing the middle frame for the back view
+        back_frame = frames[back_frame_index]  # Selecting the back frame
+
+        # Convert the back frame to a PIL image and save it
+        back_frame_folder = './back_views'
+        back_frame_image = Image.fromarray(back_frame)
+        back_frame_path = f'{back_frame_folder}/{image_uid}_back_frame.png'
+        back_frame_image.save(back_frame_path)
+        print(f"Back frame saved at {back_frame_path}")
+
+        # Write all frames to create a video if required
         imageio.mimwrite(output_path, np.stack(frames), fps=fps)
         if verbose:
             print(f"Saved video to {output_path}")
@@ -205,6 +219,7 @@ class LRMInferrer:
                         v[0],
                         os.path.join(dump_path, f'{uid}.mp4'),
                         fps=40,
+                        image_uid=uid
                     )
         
 
